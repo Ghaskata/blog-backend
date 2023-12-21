@@ -4,6 +4,24 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
+const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccesToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false }); //required: [true, "password is required"] constarain in schema so when save if we not pass password give error
+
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "something gets wrong while generating access and refresh token"
+    );
+  }
+};
+
 const registerUser = asyncHandler(async (req, res) => {
   //   req.body data means get data from frontend
   //   validation - not empty
@@ -32,8 +50,6 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User with email or username already exist");
   }
 
-
-
   // console.log("req.files >>> ",req.files)
 
   // let coverImageLocalPath;
@@ -45,11 +61,9 @@ const registerUser = asyncHandler(async (req, res) => {
   //   coverImageLocalPath = req.files?.coverImage[0]?.path;
   // }
 
-
-
   // const avatarLocalPath = req.files?.avatar[0]?.path;
   // const coverImageLocalPath = req.files?.coverImage[0]?.path;
-  
+
   const avatarLocalPath =
     req.files && Array.isArray(req.files.avatar) && req.files.avatar.length > 0
       ? req.files?.avatar[0]?.path
@@ -63,8 +77,6 @@ const registerUser = asyncHandler(async (req, res) => {
   ) {
     coverImageLocalPath = req.files?.coverImage[0]?.path;
   }
-
-  
 
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar file is required");
@@ -100,4 +112,60 @@ const registerUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, createdUser, "User Registered Succesfully"));
 });
 
-export { registerUser };
+const loginUser = asyncHandler(async (req, res) => {
+  // req.body - data
+  // validate data - username or email
+  // find User
+  // password check
+  // access and refresh token
+  // send cookie
+
+  const { username, email, password } = req.body;
+  if (!username || !email) {
+    throw new ApiError(400, "username or email is required");
+  }
+
+  const user = await User.findOne({ $or: [{ email }, { username }] });
+
+  if (!user) {
+    throw new ApiError(404, "user does not exist");
+  }
+
+  //User is mongoose object so it has mongoose method like find,findOne,update etc..
+  //user is create by us and isPasswordCorrect,generateAccesToken.. that create by us
+  const isPasswordValid = await user.isPasswordCorrect(password);
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid user credintials");
+  }
+
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    user._id
+  );
+
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  }; //by default cookie can modify from frontend also after this options it only modify by server
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        "user logged in succesfully"
+      )
+    );
+});
+
+export { registerUser, loginUser };
