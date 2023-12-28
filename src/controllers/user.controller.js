@@ -294,7 +294,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
   const oldUser = await User.findById(req.user?._id);
 
-  const deleteOldAvatarInCloudinary=await deleteOnCloudinary(oldUser.Avatar)
+  const deleteOldAvatarInCloudinary = await deleteOnCloudinary(oldUser.Avatar);
 
   if (!deleteOldAvatarInCloudinary) {
     throw new ApiError(500, "error while deleting old file from cloudinary");
@@ -329,7 +329,9 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
   const oldUser = await User.findById(req.user?._id);
 
-  const deleteOldCoverImageInCloudinary=await deleteOnCloudinary(oldUser.coverImage)
+  const deleteOldCoverImageInCloudinary = await deleteOnCloudinary(
+    oldUser.coverImage
+  );
 
   if (!deleteOldCoverImageInCloudinary) {
     throw new ApiError(500, "error while deleting old file from cloudinary");
@@ -339,7 +341,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   if (!coverImage) {
     throw new ApiError(400, "error while uploading on cloudinary");
   }
-  
+
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
@@ -355,6 +357,77 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "coverImage updated succesfully"));
 });
 
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+
+  if (!username?.trim()) {
+    throw new ApiError(400, "username is missing");
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscibers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscibedTo",
+      },
+    },
+    {
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscibers",
+        },
+        channelsSubscibedToCount: {
+          $size: "$subscibedTo",
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscibers.subsciber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullname: 1,
+        username: 1,
+        subscribersCount: 1,
+        channelsSubscibedToCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1,
+        email: 1,
+      },
+    },
+  ]);
+
+  console.log("channel >>> ", channel);
+
+  if (!channel?.length) {
+    throw new ApiError(404, "channel does not exist");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, channel[0], "user channel fatched succesfully"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -365,4 +438,5 @@ export {
   updateAccountDetails,
   updateUserAvatar,
   updateUserCoverImage,
+  getUserChannelProfile,
 };
