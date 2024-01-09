@@ -32,13 +32,21 @@ const deleteOnCloudinary = async (cloudinaryUrl) => {
   try {
     if (!cloudinaryUrl) return null;
 
-    const response = await cloudinary.uploader.destroy(cloudinaryUrl);
+    const publicId = cloudinaryUrl.split("/").pop().split(".")[0];
+    console.log("Public id >>> ", publicId);
 
-    console.log(response);
+    if (!publicId) {
+      console.error("Unable to extract public ID from the Cloudinary URL");
+      return null;
+    }
+
+    const response = await cloudinary.uploader.destroy(publicId);
+
+    console.log("delete on cloudinary response >>> ", response);
 
     return response;
-    
   } catch (error) {
+    console.log("Error deleting on Cloudinary:", error);
     return null;
   }
 };
