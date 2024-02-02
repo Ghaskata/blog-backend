@@ -44,18 +44,21 @@ const updateComment = asyncHandler(async (req, res) => {
     throw new ApiError(403, "invalid comment id , comment not exist");
   }
 
-  const updatedComment = await Comment.findOneAndUpdate(
-    { _id: commentExist._id },
-    { $set: { content: content } }
+  const updatedComment = await Comment.findByIdAndUpdate(
+    commentExist._id,
+    {
+      $set: { content: content },
+    },
+    { new: true }
   );
-  if (!updateComment) {
+  if (!updatedComment) {
     throw new ApiError(500, "somthing gets wrong white updateing comment");
   }
-  console.log("updated comment >>>", updateComment);
+  console.log("updated comment >>>", updatedComment);
   return res
     .status(200)
     .json(
-      new ApiResponse(200, createdComment, "commente updated successfully")
+      new ApiResponse(200, updatedComment, "commente updated successfully")
     );
 });
 
