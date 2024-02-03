@@ -24,6 +24,6 @@ import tweetRouter from "./routes/tweet.routes.js";
 //routes declaration
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/comment", commentRouter);
-app.use("/api/vi/tweet", tweetRouter);
+app.use("/api/v1/tweet", tweetRouter);
 
 export { app };
