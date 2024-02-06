@@ -57,7 +57,7 @@ const updateComment = asyncHandler(async (req, res) => {
     throw new ApiError(403, "invalid comment id , comment not exist");
   }
 
-  if (commentExist.owner !== req.user._id) {
+  if (commentExist.owner.toString() !== req.user._id.toString()) {
     throw new ApiError(402, "comment not made by your you can't update it");
   }
 
@@ -97,7 +97,7 @@ const deleteComment = asyncHandler(async (req, res) => {
     throw new ApiError(403, "comment not exist");
   }
 
-  if (commentExist.owner !== req.user._id) {
+  if (commentExist.owner.toString() !== req.user._id.toString()) {
     throw new ApiError(402, "comment not made by your you can't delete it");
   }
 
@@ -128,31 +128,13 @@ const getVideoComments = asyncHandler(async (req, res) => {
     throw new ApiError(403, "invalid vedio id vedio not exist");
   }
 
-  const { page = 1, limit = 10 } = req.query;
-  //   const comments = await Video.aggregate([
-  //     {
-  //       $match: (_id = mongoose.Types.ObjectId(videoId)),
-  //     },
-  //     {
-  //       $lookup: {
-  //         from: "Comment",
-  //         localField: "_id",
-  //         foreignField: "video",
-  //         as: "comment",
-  //       },
-  //     },
-  //     {
-  //       $addFields: {
-  //         $first: "$comment",
-  //       },
-  //     },
-  //   ]);
+  const { page = 1, limit = 10 } = req.query; //for pagination
 
   const comments = await Comment.find({
-    videoId: videoObjectId,
+    video: videoObjectId,
   });
 
-  console.log("get all comments >>> ", comments);
+  // console.log("get all comments >>> ", comments);
   return res
     .status(200)
     .json(new ApiResponse(200, comments, "get Allcomments"));
