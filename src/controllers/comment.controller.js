@@ -132,7 +132,9 @@ const getVideoComments = asyncHandler(async (req, res) => {
 
   const comments = await Comment.find({
     video: videoObjectId,
-  });
+  })
+    .populate("owner", "_id username fullname email avatar")
+    .sort({ updatedAt: -1 });
 
   // console.log("get all comments >>> ", comments);
   return res
