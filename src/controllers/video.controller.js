@@ -63,6 +63,35 @@ const getAllVideos = asyncHandler(async (req, res) => {
   console.log("sort stage >> ", sortStage);
   pipline.push({ $sort: sortStage });
 
+  //lookup statge
+  pipline.push({
+    $lookup: {
+      from: "users",
+      localField: "owner",
+      foreignField: "_id",
+      as: "owner",
+      pipeline: [
+        {
+          $project: {
+            _id: 1,
+            username: 1,
+            email: 1,
+            fullname: 1,
+            avatar: 1,
+            coverImage: 1,
+          },
+        },
+      ],
+    },
+  });
+  pipline.push({
+    $addFields: {
+      owner: {
+        $first: "$owner",
+      },
+    },
+  });
+
   //   pagination option
   const options = {
     page: parseInt(page),
@@ -122,7 +151,10 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "video id not found");
   }
   const videoObjectId = new mongoose.Types.ObjectId(videoId);
-  const videoExist = await Video.findById(videoObjectId);
+  const videoExist = await Video.findById(videoObjectId).populate(
+    "owner",
+    "_id username fullname email avatar coverImage"
+  );
   if (!videoExist) {
     throw new ApiError(404, "video is not exist");
   }
@@ -258,6 +290,48 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedVideo, "video updated successfully"));
 });
 
+const playVideo = asyncHandler(async (req, res) => {
+  console.log("=========================play video controller");
+  const { videoId } = req.params;
+  const videoObjectId = new mongoose.Types.ObjectId(videoId);
+  const videoExist = await Video.findById(videoObjectId);
+  if (!videoExist) {
+    throw new ApiError(404, "video not found");
+  }
+
+  const updateUserHistoryIfVideoExist = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $pull: { watchHistory: videoObjectId }, // Remove old videoId if present
+    },
+    {
+      new: true,
+    }
+  );
+
+  const updateUserHistory = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $push: { watchHistory: { $each: [videoObjectId], $position: 0 } }, // Push new videoId to the front
+    },
+    { new: true }
+  );
+
+  const updatedVideo = await Video.findByIdAndUpdate(
+    videoObjectId,
+    { $inc: { views: 1 } },
+    { new: true }
+  );
+
+  if (!updateVideo || !updateUserHistory) {
+    throw new ApiError(500, "somthing wents wrong");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedVideo, "views add + history added"));
+});
+
 export {
   getAllVideos,
   publishVideo,
@@ -265,4 +339,5 @@ export {
   updateVideo,
   deleteVideo,
   togglePublishStatus,
+  playVideo,
 };
