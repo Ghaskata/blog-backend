@@ -7,6 +7,72 @@ import { Like } from "../models/like.model.js";
 import { Tweet } from "../models/tweet.model.js";
 import { Comment } from "../models/comment.model.js";
 
+export const getVideoLikes = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  if (!videoId) {
+    throw new ApiError(404, "video is not found");
+  }
+  const videoObjectId = new mongoose.Types.ObjectId(videoId);
+  const videoExist = await Video.findById(videoObjectId);
+  if (!videoExist) {
+    throw new ApiError(404, "video is not found");
+  }
+  const videoLikes = await Like.aggregate([
+    {
+      $match: {
+        video: videoObjectId,
+      },
+    },
+    {
+      $group: {
+        _id: "$videoId",
+        likedBy: { $addToSet: "$likedBy" },
+        totalLikes: { $sum: 1 },
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "likedBy",
+        foreignField: "_id",
+        as: "likedByDetails",
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        video: 1,
+        totalLikes: 1,
+        likedByDetails: {
+          _id: 1,
+          username: 1,
+          fullname: 1,
+          avatar: 1,
+        },
+      },
+    },
+  ]);
+
+  const likedByMe = await Like.findOne({
+    likedBy: req.user._id,
+    video: videoObjectId,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        videoLikes.length === 0
+          ? { totalLikes: 0, likedByMe: likedByMe ? true : false }
+          : { ...videoLikes[0], likedByMe: likedByMe ? true : false },
+        "video likes found"
+      )
+    );
+});
+export const getCommentLikes = asyncHandler(async (req, res) => {});
+export const getTweetlikes = asyncHandler(async (req, res) => {});
+
 export const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   if (!videoId) {
