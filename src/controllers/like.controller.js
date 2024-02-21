@@ -25,7 +25,7 @@ export const getVideoLikes = asyncHandler(async (req, res) => {
     },
     {
       $group: {
-        _id: "$videoId",
+        _id: "$video",
         likedBy: { $addToSet: "$likedBy" },
         totalLikes: { $sum: 1 },
       },
@@ -70,7 +70,70 @@ export const getVideoLikes = asyncHandler(async (req, res) => {
       )
     );
 });
-export const getCommentLikes = asyncHandler(async (req, res) => {});
+export const getCommentLikes = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+  if (!commentId) {
+    throw new ApiError(404, "comment id is not found");
+  }
+  const commentObjectId = new mongoose.Types.ObjectId(commentId);
+  const commentExist = await Comment.findById(commentObjectId);
+  if (!commentExist) {
+    throw new ApiError(404, "comment is not found");
+  }
+
+  const commentLikes = await Like.aggregate([
+    {
+      $match: {
+        comment: commentObjectId,
+      },
+    },
+    {
+      $group: {
+        _id: "$comment",
+        likedBy: { $addToSet: "$likedBy" },
+        totalLikes: { $sum: 1 },
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "likedBy",
+        foreignField: "_id",
+        as: "likedByDetails",
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        comment: 1,
+        totalLikes: 1,
+        likedByDetails: {
+          _id: 1,
+          username: 1,
+          fullname: 1,
+          avatar: 1,
+        },
+      },
+    },
+  ]);
+
+  console.log("total Likes >>>>> ",commentLikes)
+  const likedByMe = await Like.findOne({
+    likedBy: req.user._id,
+    comment: commentObjectId,
+  });
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        commentLikes.length === 0
+          ? { totalLikes: 0, likedByMe: likedByMe ? true : false }
+          : { ...commentLikes[0], likedByMe: likedByMe ? true : false },
+        "comment likes found"
+      )
+    );
+});
 export const getTweetlikes = asyncHandler(async (req, res) => {});
 
 export const toggleVideoLike = asyncHandler(async (req, res) => {
@@ -131,6 +194,7 @@ export const toggleCommentLike = asyncHandler(async (req, res) => {
   } else {
     likedStatus = await Like.findByIdAndDelete(likeExist._id);
   }
+
   return res
     .status(200)
     .json(
