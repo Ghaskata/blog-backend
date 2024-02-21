@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import {
+  checkSubscriptionStatus,
   getSubscribedChannels,
   getUserChannelSubscribers,
   toggleSubscription,
@@ -9,6 +10,8 @@ import {
 const router = Router();
 
 router.use(verifyJWT);
+
+router.route("/:userId").get(checkSubscriptionStatus)
 
 router
   .route("/c/:channelId")

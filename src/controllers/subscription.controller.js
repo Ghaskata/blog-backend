@@ -62,7 +62,9 @@ export const getUserChannelSubscribers = asyncHandler(async (req, res) => {
 
   const AllSubscribers = await Subscription.find({
     channel: channelObjectId,
-  }).populate("subscriber");
+  })
+    .populate("subscriber")
+    .select("-password -refreshToken");
 
   return res
     .status(200)
@@ -99,6 +101,39 @@ export const getSubscribedChannels = asyncHandler(async (req, res) => {
         200,
         AllSubscribedChannels,
         `no of subscribed channel/following = ${AllSubscribedChannels.length}`
+      )
+    );
+});
+
+export const checkSubscriptionStatus = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+  const userExist = await User.findById(userId);
+  if (!userExist) {
+    throw new ApiError(404, "user not found");
+  }
+
+  if (req.user._id === userObjectId) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { channelOwner: true }, "channel owner"));
+  }
+
+  const subscriptionRecord = await Subscription.findOne({
+    $and: [{ channel: userObjectId }, { subscriber: req.user._id }],
+  });
+
+  // console.log("backend Subscription record",subscriptionRecord)
+  const isSubscribed = !!subscriptionRecord;
+
+  // console.log("backend >>>>>",isSubscribed)
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { isSubscribed: isSubscribed },
+        "subscription checked"
       )
     );
 });
